@@ -1,5 +1,6 @@
 #include <GL/glut.h>
 #include <math.h>
+#include "../RVO/RVO.h"
 
 // angle of rotation for the camera direction
 float angle = 0.0;
@@ -88,6 +89,8 @@ void processSpecialKeys(int key, int xx, int yy) {
 
 int main(int argc, char *argv[])
 {
+	RVO::RVOSimulator *sim = new RVO::RVOSimulator();
+
 	// init GLUT and create window
 
 	glutInit(&argc, argv);
