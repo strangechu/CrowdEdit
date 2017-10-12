@@ -6,8 +6,19 @@
 float angle = 0.0;
 // actual vector representing the camera's direction
 float lx = 0.0f, lz = -1.0f;
-// XZ position of the camera
-float x = 0.0f, z = 5.0f;
+// position of the camera
+float x = 0.0f, y = 0.0f, z = 200.0f;
+
+RVO::RVOSimulator *sim;
+
+void drawAgent(RVO::Vector2 pos) {
+	glPushMatrix();
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glRotatef(0.0f, 0.0f, 1.0f, 0.0f);
+	glTranslatef(pos.x(), pos.y(), 0.0f);
+	glutSolidSphere(1.f, 10, 10);
+	glPopMatrix();
+}
 
 void renderScene(void) {
 
@@ -17,24 +28,51 @@ void renderScene(void) {
 	// Reset transformations
 	glLoadIdentity();
 	// Set the camera
-	gluLookAt(0.0f, 0.0f, 100.0f,
-		0.0f, 0.0f, 0.0f,
+	gluLookAt(x, y, z,
+		x, y, z - 100.0f,
 		0.0f, 1.0f, 0.0f);
 
-	glRotatef(angle, 0.0f, 1.0f, 0.0f);
+	// Draw floor
+	glColor3f(0.9f, 0.9f, 0.9f);
+	glBegin(GL_QUADS);
+	glVertex3f(-100.0f, -100.0f, 0.0f);
+	glVertex3f(-100.0f, 100.0f, 0.0f);
+	glVertex3f(100.0f, 100.0f, 0.0f);
+	glVertex3f(100.0f, -100.0f, 0.0f);
+	glEnd();
 
-	glTranslatef(10.0f, 0.0f, 0.0f);
-	glutSolidSphere(1.f, 10, 10);
+	RVO::Vector2 goal = RVO::Vector2(100.0f, 100.0f);
+
+	RVO::Vector2 goalVector = goal - sim->getAgentPosition(0);
+
+	goalVector = RVO::normalize(goalVector);
+	sim->setAgentPrefVelocity(0, goalVector);
+
+	sim->doStep();
+
+	for (size_t i = 0; i < sim->getNumAgents(); i++) {
+		drawAgent(sim->getAgentPosition(i));
+	}
 
 	/*
-	glBegin(GL_TRIANGLE);
-	glVertex3f(-2.0f, -2.0f, 0.0f);
-	glVertex3f(2.0f, 0.0f, 0.0);
-	glVertex3f(0.0f, 2.0f, 0.0);
-	glEnd();
+	for (int i = -10; i <= 10; i++) {
+		for (int j = -10; j <= 10; j++) {
+			glPushMatrix();
+			glColor3f(1.0f, 0.0f, 0.0f);
+			glRotatef(0.0f, 0.0f, 1.0f, 0.0f);
+			glTranslatef(i * 10.0f, j * 10.0f, 0.0f);
+			glutSolidSphere(1.f, 10, 10);
+			glPopMatrix();
+		}
+	}
 	*/
 
+
 	glutSwapBuffers();
+}
+
+void mainLoop(void) {
+	renderScene();
 }
 
 void changeSize(int w, int h) {
@@ -67,29 +105,29 @@ void processSpecialKeys(int key, int xx, int yy) {
 
 	switch (key) {
 	case GLUT_KEY_LEFT:
-		angle -= 10.0f;
-		lx = sin(angle);
-		lz = -cos(angle);
+		x -= 10.0f;
 		break;
 	case GLUT_KEY_RIGHT:
-		angle += 10.0f;
-		lx = sin(angle);
-		lz = -cos(angle);
+		x += 10.0f;
 		break;
 	case GLUT_KEY_UP:
-		x += lx * fraction;
-		z += lz * fraction;
+		y += 10.0f;
 		break;
 	case GLUT_KEY_DOWN:
-		x -= lx * fraction;
-		z -= lz * fraction;
+		y -= 10.0f;
 		break;
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	RVO::RVOSimulator *sim = new RVO::RVOSimulator();
+	sim = new RVO::RVOSimulator();
+
+	sim->setTimeStep(0.25f);
+
+	sim->setAgentDefaults(15.0f, 10, 5.0f, 5.0f, 2.0f, 2.0f);
+	sim->addAgent(RVO::Vector2(0.0f, 0.0f));
+
 
 	// init GLUT and create window
 
@@ -97,12 +135,12 @@ int main(int argc, char *argv[])
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(100, 100);
 	glutInitWindowSize(320, 320);
-	glutCreateWindow("Lighthouse3D - GLUT Tutorial");
+	glutCreateWindow("CrowdEdit");
 
 	// register callbacks
 	glutDisplayFunc(renderScene);
 	glutReshapeFunc(changeSize);
-	glutIdleFunc(renderScene);
+	glutIdleFunc(mainLoop);
 	//glutKeyboardFunc(processNormalKeys);
 	glutSpecialFunc(processSpecialKeys);
 
