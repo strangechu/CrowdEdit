@@ -1,5 +1,6 @@
 #include <GL/glut.h>
-#include <math.h>
+#include <cmath>
+#include <vector>
 #include "../RVO/RVO.h"
 
 // angle of rotation for the camera direction
@@ -7,9 +8,14 @@ float angle = 0.0;
 // actual vector representing the camera's direction
 float lx = 0.0f, lz = -1.0f;
 // position of the camera
-float x = 0.0f, y = 0.0f, z = 200.0f;
+float x = 0.0f, y = 0.0f, z = 240.0f;
+
+float width = 0.0f;
+float height = 0.0f;
 
 RVO::RVOSimulator *sim;
+
+std::vector<RVO::Vector2> goals;
 
 void drawAgent(RVO::Vector2 pos) {
 	glPushMatrix();
@@ -18,6 +24,11 @@ void drawAgent(RVO::Vector2 pos) {
 	glTranslatef(pos.x(), pos.y(), 0.0f);
 	glutSolidSphere(1.f, 10, 10);
 	glPopMatrix();
+}
+
+void addAgent(RVO::Vector2 pos, RVO::Vector2 goal) {
+	sim->addAgent(pos);
+	goals.push_back(goal);
 }
 
 void renderScene(void) {
@@ -41,12 +52,11 @@ void renderScene(void) {
 	glVertex3f(100.0f, -100.0f, 0.0f);
 	glEnd();
 
-	RVO::Vector2 goal = RVO::Vector2(100.0f, 100.0f);
-
-	RVO::Vector2 goalVector = goal - sim->getAgentPosition(0);
-
-	goalVector = RVO::normalize(goalVector);
-	sim->setAgentPrefVelocity(0, goalVector);
+	for (size_t i = 0; i < sim->getNumAgents(); i++) {
+		RVO::Vector2 goalVector = goals[i] - sim->getAgentPosition(i);
+		goalVector = RVO::normalize(goalVector) * 10.0f;
+		sim->setAgentPrefVelocity(i, goalVector);
+	}
 
 	sim->doStep();
 
@@ -54,21 +64,13 @@ void renderScene(void) {
 		drawAgent(sim->getAgentPosition(i));
 	}
 
-	/*
-	for (int i = -10; i <= 10; i++) {
-		for (int j = -10; j <= 10; j++) {
-			glPushMatrix();
-			glColor3f(1.0f, 0.0f, 0.0f);
-			glRotatef(0.0f, 0.0f, 1.0f, 0.0f);
-			glTranslatef(i * 10.0f, j * 10.0f, 0.0f);
-			glutSolidSphere(1.f, 10, 10);
-			glPopMatrix();
-		}
-	}
-	*/
-
-
 	glutSwapBuffers();
+}
+
+RVO::Vector2 mouse2DPick(int mouse_x, int mouse_y) {
+	float x = ((2.0f * mouse_x) / width - 1.0f) * 100.0f;
+	float y = (1.0f - (2.0f * mouse_y) / height) * 100.0f;
+	return RVO::Vector2(x, y);
 }
 
 void mainLoop(void) {
@@ -97,6 +99,9 @@ void changeSize(int w, int h) {
 
 	// Get Back to the Modelview
 	glMatrixMode(GL_MODELVIEW);
+
+	width = w;
+	height = h;
 }
 
 void processSpecialKeys(int key, int xx, int yy) {
@@ -119,6 +124,19 @@ void processSpecialKeys(int key, int xx, int yy) {
 	}
 }
 
+void processMouse(int button, int state, int x, int y) {
+	RVO::Vector2 pos = mouse2DPick(x, y);
+	switch (button) {
+	case GLUT_LEFT_BUTTON:
+		addAgent(pos, -pos);
+		break;
+	case GLUT_RIGHT_BUTTON:
+		break;
+	default:
+		break;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	sim = new RVO::RVOSimulator();
@@ -126,7 +144,12 @@ int main(int argc, char *argv[])
 	sim->setTimeStep(0.25f);
 
 	sim->setAgentDefaults(15.0f, 10, 5.0f, 5.0f, 2.0f, 2.0f);
-	sim->addAgent(RVO::Vector2(0.0f, 0.0f));
+	
+	// add agents
+	for (int i = 0; i < 200; i++) {
+		RVO::Vector2 start = 100.0f * RVO::Vector2(std::cos(i * 2.0f * 3.14 / 20.0f), std::sin(i * 2.0f * 3.14 / 20.0f));
+		addAgent(start, -start);
+	}
 
 
 	// init GLUT and create window
@@ -134,7 +157,7 @@ int main(int argc, char *argv[])
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(100, 100);
-	glutInitWindowSize(320, 320);
+	glutInitWindowSize(640, 640);
 	glutCreateWindow("CrowdEdit");
 
 	// register callbacks
@@ -143,6 +166,7 @@ int main(int argc, char *argv[])
 	glutIdleFunc(mainLoop);
 	//glutKeyboardFunc(processNormalKeys);
 	glutSpecialFunc(processSpecialKeys);
+	glutMouseFunc(processMouse);
 
 	// OpenGL init
 	glEnable(GL_DEPTH_TEST);
